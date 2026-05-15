@@ -1,15 +1,33 @@
-const { analyzeResume } = require("../controllers/aiController");
 const express = require("express");
+const path = require("path");
+const multer = require("multer");
+const authMiddleware = require("../middleware/authMiddleware");
+const {
+  askAI,
+  analyzeResume,
+  buildResume,
+  mockInterview,
+  analyzePerformance,
+  uploadDocument,
+  getHistory,
+} = require("../controllers/aiController");
+
 const router = express.Router();
 
-const authMiddleware = require("../middleware/authMiddleware");
-const { askAI } = require("../controllers/aiController");
-router.post("/resume", authMiddleware, analyzeResume);
-router.get("/history", authMiddleware, async (req, res) => {
-  const user = await User.findById(req.user.id);
-  res.json({ history: user.history });
+const upload = multer({
+  dest: path.join(__dirname, "../uploads"),
+  limits: { fileSize: 8 * 1024 * 1024 },
 });
-// protected route
+
+router.post("/resume", authMiddleware, analyzeResume);
+router.post("/resume/build", authMiddleware, buildResume);
+router.post("/interview", authMiddleware, mockInterview);
+router.post("/performance", authMiddleware, analyzePerformance);
+router.post("/upload", authMiddleware, upload.single("file"), uploadDocument);
+
 router.post("/ask", authMiddleware, askAI);
+router.post("/career", authMiddleware, askAI);
+
+router.get("/history", authMiddleware, getHistory);
 
 module.exports = router;

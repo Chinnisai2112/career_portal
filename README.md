@@ -1,70 +1,87 @@
-# Getting Started with Create React App
+# Career Development Portal
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React + Express career development portal with:
 
-## Available Scripts
+- ATS resume checker
+- AI resume builder
+- Mock interview AI
+- Performance analysis
+- Career guidance
+- Document upload for `.txt` and `.pdf`
+- Auth, backend APIs, MongoDB user history
 
-In the project directory, you can run:
+## AI Provider Setup
 
-### `npm start`
+The app is configured so every AI feature can use its own API key. This keeps quota usage separated.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Create a `.env` file in the project root:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```env
+PORT=5000
+MONGO_URI=mongodb://127.0.0.1:27017/career_portal
+JWT_SECRET=change_this_secret
+JWT_EXPIRES_IN=1d
+ADMIN_HOST_EMAIL=host@example.com
 
-### `npm test`
+# Resume ATS checker - Groq free tier
+GROQ_API_KEY_RESUME_CHECKER=your_groq_key
+GROQ_RESUME_MODEL=llama-3.1-8b-instant
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# Resume builder - Gemini free tier
+GEMINI_API_KEY_RESUME_BUILDER=your_gemini_key
+GEMINI_RESUME_BUILDER_MODEL=gemini-2.0-flash
 
-### `npm run build`
+# Mock interview - Gemini free tier
+GEMINI_API_KEY_INTERVIEW=your_gemini_key
+GEMINI_INTERVIEW_MODEL=gemini-2.0-flash
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+# Career guidance - Gemini free tier
+GEMINI_API_KEY_CAREER=your_gemini_key
+GEMINI_CAREER_MODEL=gemini-2.0-flash
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Performance analysis - OpenRouter free model first, Groq fallback
+OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_PERFORMANCE_MODEL=google/gemma-2-9b-it:free
+GROQ_API_KEY_PERFORMANCE=your_groq_key
+GROQ_PERFORMANCE_MODEL=llama-3.1-8b-instant
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Fallbacks are supported:
 
-### `npm run eject`
+- `GROQ_API_KEY` can be used when a feature-specific Groq key is not set.
+- `GEMINI_API_KEY` can be used when a feature-specific Gemini key is not set.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Run Locally
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Install dependencies:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+npm install
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Start the backend API:
 
-## Learn More
+```bash
+npm run dev
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Start the React frontend in another terminal:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+npm start
+```
 
-### Code Splitting
+Frontend: `http://localhost:3000`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Backend: `http://localhost:5000`
 
-### Analyzing the Bundle Size
+## Admin Monitor
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+The host can monitor users at `http://localhost:3000/admin`.
 
-### Making a Progressive Web App
+Admin access is allowed when either condition is true:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- The logged-in user's email is listed in `ADMIN_HOST_EMAIL`.
+- The user's MongoDB document has `isAdmin: true`.
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The admin page shows total users, new users in the last 7 days, users with AI history, admin users, searchable user rows, and truncated per-user AI history previews.
