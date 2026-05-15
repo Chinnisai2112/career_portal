@@ -3,7 +3,7 @@ import { NavLink, Link } from "react-router-dom";
 import api from "../lib/api";
 
 const mainNav = [
-  { to: "/", label: "Career Studio", mark: "01" },
+  { to: "/", label: "Home", mark: "01" },
   { to: "/ai", label: "Career Guidance", mark: "02" },
   { to: "/resume", label: "Resume Lab", mark: "03" },
   { to: "/interview", label: "Mock Interview", mark: "04" },

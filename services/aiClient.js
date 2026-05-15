@@ -113,7 +113,11 @@ function resumeBuilderGeminiKey() {
 }
 
 function performanceGroqKey() {
-  return env("GROQ_API_KEY_PERFORMANCE", ["GROQ_API_KEY_RESUME", "GROQ_API_KEY"]);
+  return env("GROQ_API_KEY_PERFORMANCE", ["GROQ_API_KEY"]);
+}
+
+function performanceGeminiKey() {
+  return env("GEMINI_API_KEY_PERFORMANCE", ["GEMINI_API_KEY"]);
 }
 
 function interviewGeminiKey() {
@@ -135,6 +139,7 @@ module.exports = {
   resumeCheckerGroqKey,
   resumeBuilderGeminiKey,
   performanceGroqKey,
+  performanceGeminiKey,
   interviewGeminiKey,
   careerGeminiKey,
   openRouterKey,

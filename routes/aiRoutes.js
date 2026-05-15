@@ -10,6 +10,7 @@ const {
   analyzePerformance,
   uploadDocument,
   getHistory,
+  getAiConfig,
 } = require("../controllers/aiController");
 
 const router = express.Router();
@@ -18,6 +19,8 @@ const upload = multer({
   dest: path.join(__dirname, "../uploads"),
   limits: { fileSize: 8 * 1024 * 1024 },
 });
+
+router.get("/config", getAiConfig);
 
 router.post("/resume", authMiddleware, analyzeResume);
 router.post("/resume/build", authMiddleware, buildResume);

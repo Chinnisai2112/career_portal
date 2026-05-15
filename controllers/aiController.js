@@ -5,21 +5,44 @@ const {
   groqChat,
   geminiChat,
   openRouterChat,
-  resumeGroqKey,
+  resumeCheckerGroqKey,
+  resumeBuilderGeminiKey,
   performanceGroqKey,
+  performanceGeminiKey,
   interviewGeminiKey,
   careerGeminiKey,
   openRouterKey,
   env,
 } = require("../services/aiClient");
 
-const RESUME_MODEL = () => env("GROQ_RESUME_MODEL", []) || "llama-3.1-8b-instant";
+const RESUME_CHECKER_MODEL = () => env("GROQ_RESUME_MODEL", []) || "llama-3.1-8b-instant";
+const RESUME_BUILDER_MODEL = () => env("GEMINI_RESUME_BUILDER_MODEL", []) || "gemini-2.0-flash";
 const PERFORMANCE_OPENROUTER_MODEL =
   () => env("OPENROUTER_PERFORMANCE_MODEL", []) || "google/gemma-2-9b-it:free";
 const PERFORMANCE_GROQ_MODEL =
   () => env("GROQ_PERFORMANCE_MODEL", []) || "llama-3.1-8b-instant";
+const PERFORMANCE_GEMINI_MODEL = () => env("GEMINI_PERFORMANCE_MODEL", []) || "gemini-2.0-flash";
 const INTERVIEW_GEMINI_MODEL = () => env("GEMINI_INTERVIEW_MODEL", []) || "gemini-2.0-flash";
 const CAREER_GEMINI_MODEL = () => env("GEMINI_CAREER_MODEL", []) || "gemini-2.0-flash";
+
+function clip(text, max = 280) {
+  const s = String(text ?? "").trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}…`;
+}
+
+async function saveHistory(userId, { question, answer, category }) {
+  if (!userId) return;
+  await User.findByIdAndUpdate(userId, {
+    $push: {
+      history: {
+        question: clip(question, 320),
+        answer: clip(answer, 12000),
+        category: category || "career",
+      },
+    },
+  });
+}
 
 async function runPerformanceAi(messages) {
   const orKey = openRouterKey();
@@ -29,9 +52,78 @@ async function runPerformanceAi(messages) {
       model: PERFORMANCE_OPENROUTER_MODEL(),
     });
   }
+
+  const gemKey = performanceGeminiKey();
+  if (gemKey) {
+    return geminiChat({
+      apiKey: gemKey,
+      model: PERFORMANCE_GEMINI_MODEL(),
+      messages,
+    });
+  }
+
   const gKey = performanceGroqKey();
   return groqChat(messages, { apiKey: gKey, model: PERFORMANCE_GROQ_MODEL() });
 }
+
+const getAiConfig = async (req, res) => {
+  const hasGroqChecker = !!resumeCheckerGroqKey();
+  const hasGeminiBuilder = !!resumeBuilderGeminiKey();
+  const hasInterview = !!interviewGeminiKey();
+  const hasCareer = !!careerGeminiKey();
+  const perfOpenRouter = !!openRouterKey();
+  const perfGemini = !!performanceGeminiKey();
+  const perfGroq = !!performanceGroqKey();
+
+  let performanceProvider = "Not configured";
+  if (perfOpenRouter) performanceProvider = "OpenRouter (free tier)";
+  else if (perfGemini) performanceProvider = "Google Gemini";
+  else if (perfGroq) performanceProvider = "Groq";
+
+  res.json({
+    providers: {
+      resumeChecker: {
+        label: "ATS Resume Checker",
+        engine: "Groq",
+        model: RESUME_CHECKER_MODEL(),
+        configured: hasGroqChecker,
+        envHint: "GROQ_API_KEY_RESUME_CHECKER",
+      },
+      resumeBuilder: {
+        label: "Resume Builder",
+        engine: "Google Gemini",
+        model: RESUME_BUILDER_MODEL(),
+        configured: hasGeminiBuilder,
+        envHint: "GEMINI_API_KEY_RESUME_BUILDER",
+      },
+      interview: {
+        label: "Mock Interview",
+        engine: "Google Gemini",
+        model: INTERVIEW_GEMINI_MODEL(),
+        configured: hasInterview,
+        envHint: "GEMINI_API_KEY_INTERVIEW",
+      },
+      career: {
+        label: "Career Guidance",
+        engine: "Google Gemini",
+        model: CAREER_GEMINI_MODEL(),
+        configured: hasCareer,
+        envHint: "GEMINI_API_KEY_CAREER",
+      },
+      performance: {
+        label: "Performance Analysis",
+        engine: performanceProvider,
+        model: perfOpenRouter
+          ? PERFORMANCE_OPENROUTER_MODEL()
+          : perfGemini
+            ? PERFORMANCE_GEMINI_MODEL()
+            : PERFORMANCE_GROQ_MODEL(),
+        configured: perfOpenRouter || perfGemini || perfGroq,
+        envHint: "OPENROUTER_API_KEY or GEMINI_API_KEY_PERFORMANCE or GROQ_API_KEY_PERFORMANCE",
+      },
+    },
+  });
+};
 
 const getHistory = async (req, res) => {
   try {
@@ -39,7 +131,8 @@ const getHistory = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json({ history: user.history || [] });
+    const history = (user.history || []).slice().reverse();
+    res.json({ history });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -57,7 +150,7 @@ const askAI = async (req, res) => {
     if (!key) {
       return res.status(503).json({
         message:
-          "Career guidance needs a Gemini API key. Set GEMINI_API_KEY_CAREER or GEMINI_API_KEY in your .env (Google AI Studio free tier).",
+          "Career guidance needs a Gemini API key. Set GEMINI_API_KEY_CAREER or GEMINI_API_KEY (Google AI Studio free tier).",
       });
     }
 
@@ -76,11 +169,9 @@ const askAI = async (req, res) => {
       messages,
     });
 
-    await User.findByIdAndUpdate(req.user.id, {
-      $push: { history: { question, answer, category: "career" } },
-    });
+    await saveHistory(req.user.id, { question, answer, category: "career" });
 
-    res.json({ answer });
+    res.json({ answer, provider: "gemini" });
   } catch (error) {
     console.error("Career AI ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -96,11 +187,11 @@ const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "resumeText is required" });
     }
 
-    const key = resumeGroqKey();
+    const key = resumeCheckerGroqKey();
     if (!key) {
       return res.status(503).json({
         message:
-          "Resume ATS needs a Groq API key. Set GROQ_API_KEY_RESUME or GROQ_API_KEY (Groq free tier).",
+          "Resume ATS needs a Groq API key. Set GROQ_API_KEY_RESUME_CHECKER or GROQ_API_KEY (Groq free tier).",
       });
     }
 
@@ -116,8 +207,15 @@ const analyzeResume = async (req, res) => {
       },
     ];
 
-    const result = await groqChat(messages, { apiKey: key, model: RESUME_MODEL() });
-    res.json({ result });
+    const result = await groqChat(messages, { apiKey: key, model: RESUME_CHECKER_MODEL() });
+
+    await saveHistory(req.user.id, {
+      question: "ATS resume check",
+      answer: result,
+      category: "resume-ats",
+    });
+
+    res.json({ result, provider: "groq" });
   } catch (error) {
     console.error("Resume ATS ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -133,10 +231,11 @@ const buildResume = async (req, res) => {
       return res.status(400).json({ message: "profile is required (experience, skills, education as text)" });
     }
 
-    const key = resumeGroqKey();
+    const key = resumeBuilderGeminiKey();
     if (!key) {
       return res.status(503).json({
-        message: "Resume builder uses the same Groq keys as ATS. Set GROQ_API_KEY_RESUME or GROQ_API_KEY.",
+        message:
+          "Resume builder needs a Gemini API key. Set GEMINI_API_KEY_RESUME_BUILDER or GEMINI_API_KEY (Google AI Studio free tier).",
       });
     }
 
@@ -157,8 +256,19 @@ const buildResume = async (req, res) => {
       },
     ];
 
-    const result = await groqChat(messages, { apiKey: key, model: RESUME_MODEL() });
-    res.json({ result });
+    const result = await geminiChat({
+      apiKey: key,
+      model: RESUME_BUILDER_MODEL(),
+      messages,
+    });
+
+    await saveHistory(req.user.id, {
+      question: "Resume build",
+      answer: result,
+      category: "resume-build",
+    });
+
+    res.json({ result, provider: "gemini" });
   } catch (error) {
     console.error("Resume build ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -198,7 +308,14 @@ If the candidate says "end", wrap up with strengths, improvements, and a sample 
       messages: normalized,
     });
 
-    res.json({ reply });
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    await saveHistory(req.user.id, {
+      question: `Interview (${jobRole || "general"}): ${clip(lastUser?.content, 120)}`,
+      answer: reply,
+      category: "interview",
+    });
+
+    res.json({ reply, provider: "gemini" });
   } catch (error) {
     console.error("Interview AI ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -210,7 +327,15 @@ If the candidate says "end", wrap up with strengths, improvements, and a sample 
 const analyzePerformance = async (req, res) => {
   try {
     const { goals, wins, blockers, timeframe } = req.body;
-    const blob = [goals, wins, blockers, timeframe].filter(Boolean).join("\n");
+    const blob = [
+      timeframe ? `Timeframe: ${timeframe}` : "",
+      goals ? `Goals:\n${goals}` : "",
+      wins ? `Wins:\n${wins}` : "",
+      blockers ? `Blockers:\n${blockers}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     if (!blob.trim()) {
       return res.status(400).json({ message: "Provide goals, wins, and/or blockers as text fields" });
     }
@@ -228,6 +353,13 @@ const analyzePerformance = async (req, res) => {
     ];
 
     const result = await runPerformanceAi(messages);
+
+    await saveHistory(req.user.id, {
+      question: `Performance review (${timeframe || "recent"})`,
+      answer: result,
+      category: "performance",
+    });
+
     res.json({ result });
   } catch (error) {
     console.error("Performance AI ERROR:", error.response?.data || error.message);
@@ -283,4 +415,5 @@ module.exports = {
   analyzePerformance,
   uploadDocument,
   getHistory,
+  getAiConfig,
 };

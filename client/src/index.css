@@ -88,6 +88,37 @@
   .cp-pill {
     @apply inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-600;
   }
+
+  .cp-card-glow {
+    @apply cp-card relative overflow-hidden;
+    box-shadow:
+      0 4px 24px -4px rgba(15, 23, 42, 0.08),
+      0 0 0 1px rgba(99, 102, 241, 0.08),
+      0 0 48px -16px rgba(99, 102, 241, 0.2);
+  }
+
+  .cp-card-glow::before {
+    content: "";
+    @apply pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full opacity-60;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 70%);
+  }
+
+  .cp-feature-card {
+    @apply block rounded-2xl border bg-white p-6 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  .cp-result-panel {
+    @apply overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft;
+  }
+
+  .cp-stat {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-soft;
+  }
+
+  .cp-hero {
+    @apply relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft;
+    background-image: theme("backgroundImage.mesh-gradient");
+  }
 }
 
 .cp-scroll::-webkit-scrollbar {

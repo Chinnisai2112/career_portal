@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api, { getApiError } from "../lib/api";
 
 function Login() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,7 +26,7 @@ function Login() {
       const res = await api.post("/auth/login", { email, password });
       localStorage.setItem("token", res.data.token);
       window.dispatchEvent(new Event("auth-change"));
-      setMessage("Welcome back — redirecting you to the app.");
+      navigate("/");
     } catch (err) {
       setError(getApiError(err, "Authentication failed"));
     }
